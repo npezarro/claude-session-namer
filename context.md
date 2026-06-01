@@ -19,8 +19,9 @@ Claude Code writes its own `{type:"ai-title"}` entry on every Stop and the in-se
 - Name quality could be improved with few-shot examples in the prompt
 - Could add a batch-naming script for retroactively naming historical sessions
 - Local copy at `~/.claude/hooks/auto-name-session.sh` and repo copy are independent; consider symlinking
-- Cache directory has no eviction; prune by mtime if it grows
 - Live multi-turn verification pending (works post-deploy in *future* sessions)
+
+Cache self-prunes entries older than 30 days on every Stop (`find ... -mtime +30 -delete`).
 
 Full closeout: privateContext/deliverables/closeouts/2026-05-31-session-namer-persist-title.md
 

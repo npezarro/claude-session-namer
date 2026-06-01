@@ -21,6 +21,9 @@ CACHE_DIR="$HOME/.claude/session-names"
 mkdir -p "$CACHE_DIR"
 CACHE_FILE="$CACHE_DIR/$SESSION_ID"
 
+# Self-prune: drop cache entries older than 30 days. Cheap, runs every Stop.
+find "$CACHE_DIR" -maxdepth 1 -type f -mtime +30 -delete 2>/dev/null || true
+
 if [[ -s "$CACHE_FILE" ]]; then
     NAME=$(cat "$CACHE_FILE")
 else
