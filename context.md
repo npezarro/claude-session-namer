@@ -19,7 +19,7 @@ Claude Code writes its own `{type:"ai-title"}` entry on every Stop and the in-se
 - Name quality could be improved with few-shot examples in the prompt
 - Could add a batch-naming script for retroactively naming historical sessions
 - Local copy at `~/.claude/hooks/auto-name-session.sh` and repo copy are independent; consider symlinking
-- Live multi-turn verification pending (works post-deploy in *future* sessions)
+- ~~Live multi-turn verification pending~~ confirmed working 2026-05-31
 
 Cache self-prunes entries older than 30 days on every Stop (`find ... -mtime +30 -delete`).
 
