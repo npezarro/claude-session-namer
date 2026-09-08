@@ -28,8 +28,34 @@ A Claude Code [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) 
 4. **Writes a deterministic first-prompt name immediately** (before the slow model call)
 5. Calls `claude -p --model sonnet` to generate a concise 2-5 word title
 6. **Upgrades** the name to `"AI Title — prompt fragment..."` as a `custom-title` entry
+7. **Mirrors the name into the FleetView registry** so the Desktop UI shows it too
 
 The hook runs **asynchronously** so it never blocks your session.
+
+### Two display surfaces read two different name stores
+
+Claude Code shows session names in two places, and they read *different* sources:
+
+- **The `--resume` picker** builds its title from typed transcript entries
+  (`custom-title` / `ai-title`) via the CLI's internal title resolver. Steps 4-6
+  feed this surface.
+- **The Desktop UI (FleetView)** renders the `name` field of the per-process
+  registry file `~/.claude/sessions/<pid>.json`. For an interactive session that
+  field is a derived slug (e.g. `npeza-f4`, `nameSource: "derived"`) written once
+  at startup and **never** upgraded from the transcript title.
+
+So a session could be nicely named in `--resume` yet still show `npeza-f4` in the
+Desktop UI. Step 7 fixes that by replicating Claude's own in-app "Rename session"
+write: it sets the registry `name` and drops `nameSource` for the live pid
+file(s) matching this session. Interactive status updates merge-preserve the
+field, so the name sticks for the life of the process. The overwrite is careful:
+it only replaces a `derived` slug (or re-asserts its own title, or fills an empty
+name) and never clobbers a manual rename (`nameSource` absent) or a background
+job's auto name (`nameSource: "auto"`).
+
+To retro-name sessions that are already running when you install this, run
+`backfill-registry-names.sh` once — it copies existing titles from
+`~/.claude/session-names/` into the live registry entries.
 
 ### Why write the deterministic name first?
 

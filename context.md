@@ -1,6 +1,43 @@
 # context.md
 
 ## Last Updated
+2026-09-08 -- FleetView registry mirror (names now show in the Desktop UI, not just --resume)
+
+## FleetView / Desktop UI fix (2026-09-08): mirror the name into the pid registry
+**Symptom:** every session was named in the `--resume` picker but the Desktop UI
+(FleetView) still showed the derived slug `npeza-XX` for all of them — except the
+one session that had been renamed by hand.
+
+**Root cause:** the two surfaces read *different* name stores.
+- `--resume` builds its title from the transcript's typed `custom-title` /
+  `ai-title` entries (the CLI's `hKt()` resolver: `agentName || customTitle ||
+  aiTitle || summary || firstPrompt || sessionId[:8]`). Steps 4-6 feed this.
+- FleetView renders the `name` field of the per-process registry file
+  `~/.claude/sessions/<pid>.json`. For an interactive session that field is set
+  ONCE at startup to a derived slug (`name: "npeza-f4", nameSource: "derived"`)
+  and is never upgraded from the transcript title. The only built-in path that
+  changes it is the in-app "Rename session" action, which sets `name` and drops
+  `nameSource` (that is why the one hand-renamed session showed correctly).
+
+Confirmed by disassembling the 2.1.220 binary: the registry writer
+(`iHt`/`x_e`), the derived-slug default, and `hKt()` for the picker are all
+present and independent; nothing copies `customTitle`/`aiTitle` into the registry
+`name`.
+
+**Fix:** `update_registry_name()` replicates the in-app rename — for the live pid
+file(s) whose `sessionId` matches, set `name` to our title and drop `nameSource`.
+Interactive status updates merge-preserve the field (`iHt` does read-modify-write
+and status writes only pass status keys), so it persists for the process life.
+Overwrite rule: replace a `derived` slug, re-assert our own title, or fill an
+empty name; never touch a manual rename (`nameSource` absent) or a bg-job auto
+name (`nameSource: "auto"`). Called from both the re-assert branch and the
+finalize step. Atomic `os.replace` shrinks the clobber window vs Claude's own
+writer; a rare lost write self-heals on the next Stop.
+
+`backfill-registry-names.sh` retro-fixes sessions that were already running at
+install time by copying `~/.claude/session-names/<sid>` titles into the registry.
+
+## Prior update
 2026-09-08 -- Deterministic-first-then-upgrade (close the coverage gap)
 
 ## Current State
