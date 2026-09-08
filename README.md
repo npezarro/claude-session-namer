@@ -25,11 +25,20 @@ A Claude Code [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) 
 1. Reads the session ID and transcript path from hook input
 2. Checks if the session already has a name (skips if so)
 3. Extracts the first user prompt from the session transcript
-4. Calls `claude -p --model sonnet` to generate a concise 2-5 word title
-5. Appends a fragment of the original prompt for context
-6. Writes the name to the session transcript as a `custom-title` entry
+4. **Writes a deterministic first-prompt name immediately** (before the slow model call)
+5. Calls `claude -p --model sonnet` to generate a concise 2-5 word title
+6. **Upgrades** the name to `"AI Title — prompt fragment..."` as a `custom-title` entry
 
 The hook runs **asynchronously** so it never blocks your session.
+
+### Why write the deterministic name first?
+
+The model call takes a few seconds. Two things used to leave sessions unnamed:
+
+- **The model call comes back empty** (usage cap, stale auth, model unavailable, or the 30s hook timeout). The old code exited without writing anything, and a one-shot `claude -p` job gets only one Stop — so it stayed on its `hostname-random-slug` fallback forever.
+- **A short-lived `claude -p` process exits before the model call returns**, tearing the async hook down with it. Interactive sessions stay alive long enough; headless jobs do not.
+
+Writing the deterministic first-prompt name *before* the model call guarantees a name exists in both cases; the model-generated name then upgrades it when it arrives.
 
 ## Requirements
 

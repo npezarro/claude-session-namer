@@ -1,16 +1,42 @@
 # context.md
 
 ## Last Updated
-2026-05-31 -- Persist title across turns (ai-title every Stop)
+2026-09-08 -- Deterministic-first-then-upgrade (close the coverage gap)
 
 ## Current State
 - Public repo, fully functional
 - Single bash script (`auto-name-session.sh`) that runs as a Claude Code Stop hook
 - Generates AI-powered session names using `claude -p --model sonnet`
-- Format: "AI Title — prompt fragment..."
+- Format: "AI Title — prompt fragment..." (or just the fragment when the model call is unavailable)
 - Caches generated name at `~/.claude/session-names/<session_id>` so `claude -p` runs once per session
-- Appends `{type:"ai-title", ...}` on EVERY Stop (beats Claude Code's own ai-title for the live header) and `{type:"custom-title", ...}` once (resume picker fallback)
+- Appends `{type:"ai-title", ...}` on EVERY Stop (beats Claude Code's own ai-title for the live header) and `{type:"custom-title", ...}` once (resume picker fallback / Remote Control's highest-priority display tier)
 - No dependencies beyond Python 3, Bash, and Claude Code CLI
+
+## Coverage fix (2026-09-08): deterministic-first-then-upgrade
+The original design called the model FIRST and only wrote a title on success. Two
+gaps left sessions stuck on their `<hostname>-<random-slug>` fallback in the
+`--resume` picker and the Remote Control UI:
+1. **Model call empty** (usage cap, stale auth, model unavailable, 30s hook
+   timeout) → old code did `exit 0`, writing no title at all. A one-shot `-p`
+   job gets exactly one Stop, so it stayed unnamed forever.
+2. **Async hook torn down with a short-lived `claude -p` process** before the
+   multi-second model call returned. Interactive sessions stay alive long enough;
+   headless `-p` jobs (the Discord bridge dispatches these) exit immediately, so
+   the naming call was killed mid-flight. Measured: in one project 142/152
+   headless sessions had NO title record; only 10 (interactive) did.
+
+Fix: write a deterministic first-prompt name (`append_ai_title`) BEFORE the model
+call, then UPGRADE it via `finalize_title` (custom-title + ai-title) once the
+model name arrives. If the process dies in between, the deterministic ai-title
+already persisted. If the model call is empty, the deterministic name stands.
+Verified in a sandbox across: model-succeeds, model-empty, and SIGKILL-after-early-write.
+
+Residual gap (not fixable by a Stop hook alone): a session killed BEFORE it ever
+emits a Stop with a first user prompt. For any automated dispatcher that shells
+out to `claude -p`, the cleaner path is to name at dispatch time with the
+`-n "<title>"` flag, because a wrapped headless prompt often leads with a fixed
+preamble rather than the actual request — so both the fragment and the model
+"Topic:" are low-quality for those jobs.
 
 ## Why ai-title (not custom-title) for the live header
 Claude Code writes its own `{type:"ai-title"}` entry on every Stop and the in-session title reads the latest one. A one-shot `custom-title` write only survives turn 1. Hook now wins the last-write race.
