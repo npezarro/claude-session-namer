@@ -1,5 +1,16 @@
 # progress.md
 
+## 2026-09-08 (Desktop names via the bridge API — the working fix)
+- The registry mirror (below) was the wrong layer: the desktop (Remote Control)
+  advertises the name in-memory over the bridge, not from `~/.claude/sessions/`.
+- Reverse-engineered `SessionsV2Client` from the 2.1.220 binary: the desktop rename
+  is a `rename_session` control request POSTed to
+  `api.anthropic.com/v1/code/sessions/<cse_id>/events` (Bearer = claudeAiOauth token).
+- Added `bridge-rename.py` (`--session`/`--all`); wired `bridge_rename` into the hook
+  (replacing `update_registry_name`); removed `backfill-registry-names.sh`.
+- Verified end-to-end against a throwaway session (200 + `result=success` in its log)
+  and swept all live interactive sessions to their AI titles.
+
 ## 2026-09-08 (FleetView registry mirror)
 - Diagnosed why named sessions showed in `--resume` but not the Desktop UI:
   the picker reads transcript `custom-title`/`ai-title`; FleetView reads the

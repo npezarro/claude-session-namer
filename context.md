@@ -1,9 +1,37 @@
 # context.md
 
 ## Last Updated
-2026-09-08 -- FleetView registry mirror (names now show in the Desktop UI, not just --resume)
+2026-09-08 -- Desktop (Remote Control) names via the bridge API (supersedes the registry attempt below)
 
-## FleetView / Desktop UI fix (2026-09-08): mirror the name into the pid registry
+## Desktop UI fix v2 (2026-09-08): rename over the bridge — the one that actually works
+The registry-mirror below (v1) was the WRONG layer. The desktop (Remote Control)
+does not read `~/.claude/sessions/<pid>.json`; each `claude` process advertises its
+name **in memory over its bridge** (`claude.ai/code`), set once at launch and
+changed ONLY by a `rename_session` control request over that bridge. Editing files
+never reaches it (verified: a live process preserved an external file edit but never
+advertised it).
+
+**Fix:** `bridge-rename.py` posts the same control request the desktop's own
+"Rename" uses, straight to the session's event stream:
+```
+POST https://api.anthropic.com/v1/code/sessions/<cse_id>/events
+Authorization: Bearer <claudeAiOauth.accessToken>   # scope user:sessions:claude_code
+{ session_id, events:[{ payload:{ type:"control_request", request_id,
+    request:{ subtype:"rename_session", title } } }] }
+```
+- `bridgeSessionId` (`session_XXX`, in the local registry) → API `cse_XXX` by prefix swap.
+- Reverse-engineered from `SessionsV2Client` in the 2.1.220 binary. Transport is
+  HTTP+SSE (`/worker/events/stream` for the session, POST `/events` for controllers),
+  NOT the raw `wss://bridge.claudeusercontent.com` ws. Full map: `notes/bridge-recon.md`.
+- Verified end-to-end: POST → 200, and the target session's debug log shows
+  `[bridge:repl] Inbound control_request subtype=rename_session` + `result=success`.
+- Hook now calls `bridge_rename` (replacing `update_registry_name`); `--all` sweeps
+  every live bridged interactive session from the cache. `backfill-registry-names.sh`
+  removed. Best-effort: no/expired token or offline is a silent no-op.
+- Caveat: undocumented API; may break on CC updates. LOCAL_BRIDGE=1 only redirects
+  the *Chrome* bridge, not the RC bridge, so there is no local-capture shortcut.
+
+## (v1, superseded) FleetView / Desktop UI fix (2026-09-08): mirror the name into the pid registry
 **Symptom:** every session was named in the `--resume` picker but the Desktop UI
 (FleetView) still showed the derived slug `npeza-XX` for all of them — except the
 one session that had been renamed by hand.

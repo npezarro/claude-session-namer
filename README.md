@@ -28,7 +28,7 @@ A Claude Code [Stop hook](https://docs.anthropic.com/en/docs/claude-code/hooks) 
 4. **Writes a deterministic first-prompt name immediately** (before the slow model call)
 5. Calls `claude -p --model sonnet` to generate a concise 2-5 word title
 6. **Upgrades** the name to `"AI Title — prompt fragment..."` as a `custom-title` entry
-7. **Mirrors the name into the FleetView registry** so the Desktop UI shows it too
+7. **Pushes the name to the desktop UI over the bridge** so Remote Control shows it too
 
 The hook runs **asynchronously** so it never blocks your session.
 
@@ -39,23 +39,38 @@ Claude Code shows session names in two places, and they read *different* sources
 - **The `--resume` picker** builds its title from typed transcript entries
   (`custom-title` / `ai-title`) via the CLI's internal title resolver. Steps 4-6
   feed this surface.
-- **The Desktop UI (FleetView)** renders the `name` field of the per-process
-  registry file `~/.claude/sessions/<pid>.json`. For an interactive session that
-  field is a derived slug (e.g. `npeza-f4`, `nameSource: "derived"`) written once
-  at startup and **never** upgraded from the transcript title.
+- **The desktop UI (Remote Control)** shows the name each `claude` process
+  advertises over its **bridge** (the `claude.ai/code` connection). That name is
+  held in memory, set once at launch to a derived slug (e.g. `npeza-f4`, prefix
+  from `--remote-control-session-name-prefix`, default hostname), and **never**
+  upgraded from the transcript title. Editing local files (`~/.claude/sessions/…`)
+  does not reach it — the process advertises from memory, not from disk.
 
-So a session could be nicely named in `--resume` yet still show `npeza-f4` in the
-Desktop UI. Step 7 fixes that by replicating Claude's own in-app "Rename session"
-write: it sets the registry `name` and drops `nameSource` for the live pid
-file(s) matching this session. Interactive status updates merge-preserve the
-field, so the name sticks for the life of the process. The overwrite is careful:
-it only replaces a `derived` slug (or re-asserts its own title, or fills an empty
-name) and never clobbers a manual rename (`nameSource` absent) or a background
-job's auto name (`nameSource: "auto"`).
+So a session is nicely named in `--resume` yet still shows `npeza-f4` in the
+desktop. Step 7 fixes that with **`bridge-rename.py`**, which posts the same
+`rename_session` control request the desktop's own "Rename" uses, to the session's
+event stream:
 
-To retro-name sessions that are already running when you install this, run
-`backfill-registry-names.sh` once — it copies existing titles from
-`~/.claude/session-names/` into the live registry entries.
+```
+POST https://api.anthropic.com/v1/code/sessions/<cse_id>/events
+Authorization: Bearer <claudeAiOauth.accessToken>
+{ "session_id":"<cse_id>", "events":[{ "payload":{
+    "type":"control_request", "request_id":"<uuid>",
+    "request":{ "subtype":"rename_session", "title":"<title>" } } }] }
+```
+
+The live session receives it over its SSE stream, renames itself, and
+re-advertises — so the desktop updates. The local `bridgeSessionId` (`session_XXX`)
+maps to the API's `cse_XXX` by prefix swap. The call is best-effort: a missing or
+expired token, or being offline, is a quiet no-op that never blocks the hook.
+
+> Reverse-engineered from the `SessionsV2Client` in claude 2.1.220; it uses the
+> undocumented `/v1/code/sessions/…` API and may break on Claude Code updates.
+> See `notes/bridge-recon.md` for the full protocol map.
+
+To retro-name sessions already running when you install this, run
+`./bridge-rename.py --all` once — it renames every live bridged interactive
+session from the titles cached in `~/.claude/session-names/`.
 
 ### Why write the deterministic name first?
 
