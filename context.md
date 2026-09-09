@@ -1,7 +1,29 @@
 # context.md
 
 ## Last Updated
-2026-09-08 -- Desktop (Remote Control) names via the bridge API (supersedes the registry attempt below)
+2026-09-09 -- RETIRED. Claude Code 2.1.266 natively titles sessions; this tool is redundant and was degrading --resume.
+
+## RETIRED 2026-09-09 — superseded by native titling
+Claude Code auto-updated 2.1.220 -> **2.1.266** on 2026-09-09, which added native
+session titling (`generateSessionTitle`, an RPC the desktop invokes). Verified from
+the live API and transcripts:
+- Native titling writes clean, conversation-aware titles: on live sessions the
+  transcript carried 34-46 native `ai-title` entries (e.g. "Set up dedicated
+  Chromium browser for Oracle VM provisioning", "Fix Codex search results and local
+  model output") vs 4-5 from this hook.
+- The desktop `title` at `GET /v1/code/sessions` is native and clean.
+- **The bridge `rename_session` (v2 fix below) does NOT change the displayed title
+  on 2.1.266**: POST returns 200 and the worker logs `result=success`, but the
+  server `title` stays a slug (verified on a fresh throwaway). Ack != display.
+- **This tool was DEGRADING `--resume`**: its `custom-title` (highest priority in
+  the resolver `customTitle||aiTitle||...`) hid Claude's clean native `ai-title`
+  behind the messy first-prompt text.
+
+Action: removed the Stop hook from `~/.claude/settings.json` (backup kept). Code and
+notes retained as an investigation record. Existing sessions keep their injected
+`custom-title` until they end; new sessions get the clean native title.
+
+## (v2, now inert on 2.1.266) Desktop UI fix: rename over the bridge
 
 ## Desktop UI fix v2 (2026-09-08): rename over the bridge — the one that actually works
 The registry-mirror below (v1) was the WRONG layer. The desktop (Remote Control)

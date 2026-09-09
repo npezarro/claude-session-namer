@@ -1,5 +1,15 @@
 # Claude Session Namer
 
+> **RETIRED 2026-09-09 — superseded by Claude Code's native session titling.**
+> Claude Code **2.1.266** natively generates clean, conversation-aware session
+> titles (`generateSessionTitle`) and writes them to the `--resume` picker, the
+> local session view, and the desktop / `claude.ai/code` UI. That is strictly
+> better than this tool's first-prompt titles, and this tool's `custom-title`
+> override actually *degraded* the `--resume` picker by hiding the native title.
+> The Stop hook has been removed from `~/.claude/settings.json`; the code is kept
+> here only as a record of the investigation (see `notes/bridge-recon.md` and
+> `context.md`). Do not re-enable it on 2.1.266+.
+
 Automatically generates descriptive names for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) sessions, replacing cryptic session IDs in the `--resume` picker with human-readable titles.
 
 ## Before vs After

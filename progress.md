@@ -1,5 +1,15 @@
 # progress.md
 
+## 2026-09-09 (RETIRED)
+- Double-check after a resume revealed Claude Code auto-updated 2.1.220 -> 2.1.266,
+  which natively titles sessions across --resume, local view, and the desktop.
+- Verified the bridge rename_session does NOT change the displayed desktop title on
+  2.1.266 (200 + worker result=success, but server title unchanged) — my prior
+  "working" claim was an ack-only check, corrected.
+- Found this tool's custom-title was hiding Claude's clean native ai-title in
+  --resume (34-46 native ai-titles vs 4-5 ours per transcript).
+- Removed the Stop hook from settings.json. Marked repo RETIRED. Kept code/notes.
+
 ## 2026-09-08 (Desktop names via the bridge API — the working fix)
 - The registry mirror (below) was the wrong layer: the desktop (Remote Control)
   advertises the name in-memory over the bridge, not from `~/.claude/sessions/`.
